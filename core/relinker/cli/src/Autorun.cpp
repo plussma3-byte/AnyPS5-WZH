@@ -4,6 +4,10 @@
 #include <limits>
 #include <string>
 #include <cstdlib>
+#ifdef _WIN32
+#include <windows.h>
+#include <system_error>
+#endif
 
 namespace Cli {
 
@@ -17,7 +21,23 @@ int Autorun(const std::string& absPath, bool toWindows) {
     }
 
 #ifdef _WIN32
-    const std::string cmd = "\"" + absPath + "\"";
+    const auto application = std::filesystem::path(absPath).wstring();
+    std::wstring command = L"\"" + application + L"\"";
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, 0,
+                        nullptr, nullptr, &startup, &process)) {
+        throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), "Autorun CreateProcessW");
+    }
+    CloseHandle(process.hThread);
+    const auto wait = WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD code = 0;
+    const bool completed = wait == WAIT_OBJECT_0 && GetExitCodeProcess(process.hProcess, &code);
+    const auto error = completed ? ERROR_SUCCESS : GetLastError();
+    CloseHandle(process.hProcess);
+    if (!completed) throw std::system_error(static_cast<int>(error), std::system_category(), "Autorun wait");
+    const int rawCode = static_cast<int>(code);
 #else
     std::string cmd = "'";
     for (const char character : absPath) {
@@ -25,8 +45,8 @@ int Autorun(const std::string& absPath, bool toWindows) {
         else cmd += character;
     }
     cmd += '\'';
-#endif
     const int rawCode = std::system(cmd.c_str());
+#endif
 
     int exitCode = rawCode;
 #ifdef _WIN32

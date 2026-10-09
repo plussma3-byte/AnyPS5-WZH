@@ -1,0 +1,71 @@
+name: Windows x64 Debug artifact
+
+on:
+  push:
+    branches: [codex/windows-debug-validation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-debug-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/codex/windows-debug-validation'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      BUILD_DIR: build-win-debug
+      LOG_DIR: artifact-logs
+      SSL_CERT_FILE: C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt
+    steps:
+      - name: Check out the exact source and pinned submodules
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Select Python 3.12.12
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: '3.12.12'
+          architecture: x64
+      - name: Verify and unpack the pinned toolchain and FFmpeg
+        run: ./tools/ci/windows-debug.ps1 -Phase Dependencies
+      - name: Configure Debug, SPIR-V validation and frame timing
+        run: ./tools/ci/windows-debug.ps1 -Phase Configure
+      - name: Build project and registered tests
+        run: ./tools/ci/windows-debug.ps1 -Phase Build
+      - name: Build patched runtime libraries
+        run: ./tools/ci/windows-debug.ps1 -Phase Libraries
+      - name: Run Windows tests without games
+        run: ./tools/ci/windows-debug.ps1 -Phase Test
+      - name: Inspect PE files and package the successful build
+        run: ./tools/ci/windows-debug.ps1 -Phase Package
+      - name: Upload the verified Debug ZIP
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: AnyPS5-Windows-x64-Debug-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Preserve diagnostics even when the job fails
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Windows-Debug-diagnostics-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifact-logs/
+            build-win-debug/Testing/Temporary/
+            build-win-debug/CMakeFiles/CMakeConfigureLog.yaml
+            build-win-debug/CMakeCache.txt
+          if-no-files-found: warn
+          retention-days: 7

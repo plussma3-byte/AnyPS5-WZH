@@ -90,11 +90,44 @@ static void CheckNumberSyntax(const std::filesystem::path& path) {
     }
 }
 
+static void CheckResourceLimits(const std::filesystem::path& path) {
+    const std::string prefix = R"({"titleId":"PPSA00000","localizedParameters":{"en-US":{"titleName":"Example"}},"unused":)";
+    for (const bool objects : {false, true}) {
+        for (const unsigned nesting : {63u, 64u, 128u}) {
+            std::string text = prefix;
+            for (unsigned i = 0; i < nesting; ++i) text += objects ? "{\"x\":" : "[";
+            text += "0";
+            text.append(nesting, objects ? '}' : ']');
+            text += '}';
+            bool rejected = false;
+            try { ParseText(path, text); }
+            catch (const std::runtime_error& error) {
+                Require(std::string(error.what()) == "param.json exceeds nesting limit", "Unexpected nesting error");
+                rejected = true;
+            }
+            Require(rejected == (nesting >= 64), "Incorrect param.json nesting limit");
+        }
+    }
+    const auto valid = prefix + "0}";
+    for (const std::size_t size : {4u * 1024 * 1024, 4u * 1024 * 1024 + 1}) {
+        std::string text = valid;
+        text.resize(size, ' ');
+        bool rejected = false;
+        try { ParseText(path, text); }
+        catch (const std::runtime_error& error) {
+            Require(std::string(error.what()) == "param.json exceeds size limit", "Unexpected size error");
+            rejected = true;
+        }
+        Require(rejected == (size > 4u * 1024 * 1024), "Incorrect param.json size limit");
+    }
+}
+
 int main() {
     const auto path = std::filesystem::temp_directory_path() / ("anyps5-param-json-" +
         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".json");
     int result = 0;
     try {
+        CheckResourceLimits(path);
         CheckNumberSyntax(path);
         const std::pair<const char*, std::uint64_t> sizes[] = {
             {"", 0}, {"0", 0}, {"-0", 0}, {"0.25", 0}, {"0e3", 0}, {"0E+3", 0}, {"-0e-3", 0}, {"4096", 4096},

@@ -7,6 +7,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 int main(int, char* argv[]) {
     const auto executable = std::filesystem::absolute(argv[0]);
@@ -26,13 +29,18 @@ int main(int, char* argv[]) {
     try {
         std::filesystem::copy_file(executable, child);
         std::vector<std::string> suffixes{""};
-#ifndef _WIN32
+#ifdef _WIN32
+        if (!SetEnvironmentVariableA("ANYPS5_AUTORUN_LITERAL", "expanded"))
+            throw std::runtime_error("Cannot set autorun test environment");
+        suffixes.insert(suffixes.end(), {" %ANYPS5_AUTORUN_LITERAL%", " & literal", " (literal)", " !literal!"});
+#else
         suffixes.insert(suffixes.end(), {" $HOME", " $(printf substituted)", " `printf substituted`",
             " 'single'", " \"double\"", " \\backslash", " line\nbreak"});
 #endif
         const auto originalChild = child;
         for (const auto& suffix : suffixes) {
-            const auto renamed = std::filesystem::path(originalChild.string() + suffix);
+            const auto renamed = originalChild.parent_path() /
+                (originalChild.stem().string() + suffix + originalChild.extension().string());
             if (renamed != child) std::filesystem::rename(child, renamed);
             child = renamed;
             for (const bool windows : {false, true}) {

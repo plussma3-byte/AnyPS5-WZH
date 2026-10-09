@@ -97,6 +97,10 @@ bool replaceBinaryIdentity(IrValue& inst, IrType type, std::uint64_t identity) {
     return false;
 }
 
+bool sameValue(const IrValue& left, const IrValue& right) {
+    return &left == &right || (left.HasImmediate() && right.HasImmediate() && left == right);
+}
+
 bool foldSelect(IrValue& inst) {
     auto& condition = resolveArg(inst, 0);
     auto& trueValue = resolveArg(inst, 1);
@@ -105,7 +109,7 @@ bool foldSelect(IrValue& inst) {
         replaceWith(inst, condition.ImmediateBool() ? trueValue : falseValue);
         return true;
     }
-    if (trueValue == falseValue) {
+    if (sameValue(trueValue, falseValue)) {
         replaceWith(inst, trueValue);
         return true;
     }
@@ -121,7 +125,7 @@ bool foldPhi(IrValue& inst) {
         }
         if (same == nullptr) {
             same = value;
-        } else if (!(*same == *value)) {
+        } else if (!sameValue(*same, *value)) {
             return false;
         }
     }
