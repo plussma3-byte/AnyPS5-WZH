@@ -30,10 +30,10 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Select Python 3.12.12
+      - name: Select Python 3.12.10
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          python-version: '3.12.12'
+          python-version: '3.12.10'
           architecture: x64
       - name: Verify and unpack the pinned toolchain and FFmpeg
         run: ./tools/ci/windows-debug.ps1 -Phase Dependencies
