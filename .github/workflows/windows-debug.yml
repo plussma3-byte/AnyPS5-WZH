@@ -69,3 +69,15 @@ jobs:
             build-win-debug/CMakeCache.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Preserve matching Debug binaries for failed test symbolization
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Windows-Debug-failure-symbols-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build-win-debug/**/agc_shader_memory_tests.exe
+            build-win-debug/**/agc_driver_pm4_tests.exe
+            build-win-debug/**/guest_ajm_tests.exe
+            build-win-debug/core/libs/libs/unpatched/*.prx
+          if-no-files-found: warn
+          retention-days: 7

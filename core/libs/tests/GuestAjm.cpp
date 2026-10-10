@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -33,7 +34,15 @@ int APS5_VABI sceAjmBatchJobSetResampleParameters(AjmBatchInfo*, std::uint32_t, 
 int APS5_VABI sceAjmBatchJobGetResampleInfo(AjmBatchInfo*, std::uint32_t, void*);
 }
 
-static void Require(bool value) { if (!value) std::abort(); }
+static void RequireAt(bool value, const char* condition, const char* file, int line) {
+    if (!value) {
+        std::fprintf(stderr, "%s:%d: Require(%s) failed\n", file, line, condition);
+        std::fflush(stderr);
+        std::abort();
+    }
+}
+
+#define Require(...) RequireAt(static_cast<bool>((__VA_ARGS__)), #__VA_ARGS__, __FILE__, __LINE__)
 
 namespace {
 
